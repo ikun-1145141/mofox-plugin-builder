@@ -62,6 +62,7 @@ export class GitSyncService {
         const dir = filePath.substring(0, filePath.lastIndexOf('/'));
 
         // 创建目录
+        // @ts-ignore - lightning-fs 类型不完整
         await this.fs.promises.mkdir(dir, { recursive: true }).catch(() => {});
 
         // 写入文件
@@ -190,6 +191,7 @@ export class GitSyncService {
    */
   async cleanup(): Promise<void> {
     try {
+      // @ts-ignore - lightning-fs 类型不完整
       await this.fs.promises.rm(this.dir, { recursive: true });
       console.log('Repository cleaned up');
     } catch (error) {

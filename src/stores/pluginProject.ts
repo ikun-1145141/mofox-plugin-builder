@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { ComponentDefinition, PluginManifest, GeneratedPluginFiles, SyncStatus } from '@/types/plugin';
+import type { ComponentDefinition, PluginManifest, GeneratedPluginFiles } from '@/types/plugin';
 
 export const usePluginProjectStore = defineStore('plugin-project', {
   state: () => ({
@@ -97,7 +97,7 @@ export const usePluginProjectStore = defineStore('plugin-project', {
     },
 
     // Git 同步：一键推送到 GitHub
-    async syncToGitHub(message?: string) {
+    async syncToGitHub(_message?: string) {
       this.gitSyncStatus = 'syncing';
       try {
         // TODO: 调用 gitSyncService.syncToGitHub()
@@ -142,7 +142,7 @@ export const usePluginProjectStore = defineStore('plugin-project', {
       this.pluginVersion = '1.0.0';
       this.pluginDescription = '';
       this.components = [];
-      this.generatedManifest = {};
+      this.generatedManifest = {} as PluginManifest;
       this.generatedPluginPy = '';
       this.generatedConfigPy = '';
       this.buildStatus = 'idle';

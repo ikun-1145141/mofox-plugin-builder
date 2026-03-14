@@ -321,8 +321,8 @@ watch(currentView, (newView, oldView) => {
 const createToolbox = () => {
   return `
     <xml>
-      <category name="🦊 功能组件" colour="#06B6D4">
-        <label text="把这些拖进「我的插件」里 ↓"></label>
+      <category name="功能组件" colour="#06B6D4">
+        <label text="把这些拖进「我的插件」里"></label>
         <block type="comp_action"></block>
         <block type="comp_tool"></block>
         <block type="comp_chatter"></block>
@@ -333,21 +333,23 @@ const createToolbox = () => {
         <block type="comp_adapter"></block>
         <block type="comp_router"></block>
       </category>
-      <category name="📋 参数" colour="#F59E0B">
-        <label text="拖进「动作/工具/命令」里 ↓"></label>
+      <category name="参数定义" colour="#F59E0B">
+        <label text="拖进动作/工具/命令里"></label>
         <block type="param_text"></block>
         <block type="param_number"></block>
+        <block type="param_float"></block>
         <block type="param_switch"></block>
       </category>
-      <category name="⚙️ 插件设置" colour="#84CC16">
-        <label text="让用户能配置你的插件 ↓"></label>
+      <category name="插件配置项" colour="#84CC16">
+        <label text="让用户可以配置你的插件"></label>
         <block type="setting_toggle"></block>
         <block type="setting_text"></block>
         <block type="setting_number"></block>
+        <block type="setting_choice"></block>
       </category>
-      <category name="📦 依赖" colour="#EF4444">
-        <label text="需要其他插件时用 ↓"></label>
+      <category name="依赖声明" colour="#EF4444">
         <block type="need_plugin"></block>
+        <block type="need_component"></block>
       </category>
     </xml>
   `
@@ -386,7 +388,7 @@ const generateCode = async () => {
   // 从积木工作区解析插件信息
   const parsed = parseWorkspace(workspace)
   if (!parsed) {
-    alert('请先拖入「🦊 我的插件」积木')
+    alert('请先拖入「我的插件」积木')
     return
   }
   if (parsed.components.length === 0 && parsed.settings.length === 0) {
@@ -413,9 +415,13 @@ const generateCode = async () => {
   )
 
   // 处理依赖
-  if (parsed.dependencies.length > 0) {
-    manifest.dependencies = {
-      plugins: parsed.dependencies,
+  if (parsed.dependencies.length > 0 || parsed.componentDeps.length > 0) {
+    manifest.dependencies = {}
+    if (parsed.dependencies.length > 0) {
+      manifest.dependencies.plugins = parsed.dependencies
+    }
+    if (parsed.componentDeps.length > 0) {
+      manifest.dependencies.components = parsed.componentDeps
     }
   }
 

@@ -66,6 +66,9 @@ export class PluginBuilder {
     const classNames: string[] = [];
 
     for (const comp of components) {
+      // config 组件由 ConfigBuilder 单独生成，跳过
+      if (comp.type === 'config') continue;
+
       const className = this.getComponentClassName(comp.name, comp.type);
       classNames.push(className);
 
@@ -77,7 +80,10 @@ export class PluginBuilder {
       if (comp.type === 'action') {
         lines.push(`    action_name = "${comp.name}"`);
         lines.push(`    action_description = "${comp.description || '动作'}"`);
-        if (comp.metadata?.chatType) {
+        if (comp.metadata?.primary) {
+          lines.push('    primary_action = True');
+        }
+        if (comp.metadata?.chatType && comp.metadata.chatType !== 'ALL') {
           lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
         }
         // 生成参数 schema
@@ -97,7 +103,7 @@ export class PluginBuilder {
       } else if (comp.type === 'tool') {
         lines.push(`    tool_name = "${comp.name}"`);
         lines.push(`    tool_description = "${comp.description || '工具'}"`);
-        if (comp.metadata?.chatType) {
+        if (comp.metadata?.chatType && comp.metadata.chatType !== 'ALL') {
           lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
         }
         if (comp.params && comp.params.length > 0) {
@@ -113,19 +119,25 @@ export class PluginBuilder {
       } else if (comp.type === 'chatter') {
         lines.push(`    chatter_name = "${comp.name}"`);
         lines.push(`    chatter_description = "${comp.description || '对话器'}"`);
-        if (comp.metadata?.chatType) {
+        if (comp.metadata?.chatType && comp.metadata.chatType !== 'ALL') {
           lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
         }
         lines.push('');
         lines.push('    async def execute(self):');
         lines.push('        """对话主循环，使用 yield 返回结果"""');
-        lines.push('        from src.core.components.base.chatter import Wait, Success');
-        lines.push('        # TODO: 在这里实现你的对话逻辑');
-        lines.push('        unreads = await self.fetch_unreads()');
-        lines.push('        if not unreads:');
+        lines.push('        from src.core.components.base.chatter import Wait, Success, Failure');
+        lines.push('');
+        lines.push('        unreads_text, unread_msgs = await self.fetch_unreads()');
+        lines.push('        if not unread_msgs:');
         lines.push('            yield Wait(time=5)');
         lines.push('            return');
-        lines.push('        yield Success(message="收到消息")');
+        lines.push('');
+        lines.push('        # 创建 LLM 请求');
+        lines.push('        request = self.create_request(task="chat")');
+        lines.push('        usable_map = await self.inject_usables(request)');
+        lines.push('');
+        lines.push('        # TODO: 调用 LLM 并处理回复');
+        lines.push('        yield Success(message="回复内容")');
       } else if (comp.type === 'service') {
         lines.push(`    service_name = "${comp.name}"`);
         lines.push(`    service_description = "${comp.description || '后台服务'}"`);
@@ -144,8 +156,8 @@ export class PluginBuilder {
       } else if (comp.type === 'event_handler') {
         lines.push(`    handler_name = "${comp.name}"`);
         lines.push(`    handler_description = "${comp.description || '事件处理器'}"`);
-        lines.push('    weight = 0');
-        lines.push('    intercept_message = False');
+        lines.push(`    weight = ${comp.metadata?.weight ?? 0}`);
+        lines.push(`    intercept_message = ${comp.metadata?.intercept ? 'True' : 'False'}`);
         lines.push(`    init_subscribe = [${comp.metadata?.eventType ? `"${comp.metadata.eventType}"` : ''}]`);
         lines.push('');
         lines.push('    async def execute(self, event_name: str, params: dict):');
@@ -215,7 +227,7 @@ export class PluginBuilder {
   /**
    * 根据组件名生成类名（snake_case → PascalCase）
    */
-  private static getComponentClassName(componentName: string, componentType: string): string {
+  private static getComponentClassName(componentName: string, _componentType: string): string {
     const pascalName = componentName
       .split('_')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -276,8 +288,11 @@ export class PluginBuilder {
   private static buildParamSignature(params?: any[]): string {
     if (!params || params.length === 0) return ', **kwargs';
     const parts = params.map((p: any) => {
-      const pyType = p.type === 'string' ? 'str' : p.type === 'integer' ? 'int' : p.type === 'boolean' ? 'bool' : 'str';
-      return `${p.name}: ${pyType}`;
+      const typeMap: Record<string, string> = { string: 'str', integer: 'int', number: 'float', boolean: 'bool' };
+      const pyType = typeMap[p.type] || 'str';
+      if (p.required) return `${p.name}: ${pyType}`;
+      const defaultVal = pyType === 'str' ? 'None' : pyType === 'bool' ? 'False' : '0';
+      return `${p.name}: ${pyType} | None = ${defaultVal}`;
     });
     return ', ' + parts.join(', ');
   }

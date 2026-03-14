@@ -32,12 +32,14 @@ export class ManifestBuilder {
   private static generateComponentDeclarations(
     components: ComponentDefinition[]
   ) {
-    return components.map((comp) => ({
-      component_type: comp.type,
-      component_name: comp.name,
-      enabled: true,
-      dependencies: comp.dependencies || [],
-    }));
+    return components
+      .filter((comp) => comp.type !== 'config')
+      .map((comp) => ({
+        component_type: comp.type,
+        component_name: comp.name,
+        enabled: true,
+        dependencies: comp.dependencies || [],
+      }));
   }
 
   /**

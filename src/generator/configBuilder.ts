@@ -48,6 +48,20 @@ export class ConfigBuilder {
         lines.push(`        ${s.name}: ${pyType} = PydanticField(`);
         lines.push(`            default=${defaultExpr},`);
         lines.push(`            description="${s.description}",`);
+        // 可选约束
+        if (s.input_type && s.input_type !== 'text') {
+          lines.push(`            input_type="${s.input_type}",`);
+        }
+        if (s.choices && s.choices.length > 0) {
+          const choiceList = s.choices.map(c => `"${c}"`).join(', ');
+          lines.push(`            choices=[${choiceList}],`);
+        }
+        if (s.min !== undefined && s.min !== 0) {
+          lines.push(`            ge=${s.min},`);
+        }
+        if (s.max !== undefined && s.max !== 100) {
+          lines.push(`            le=${s.max},`);
+        }
         lines.push(`        )`);
       }
       lines.push('');
