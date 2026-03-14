@@ -17,6 +17,7 @@ export class PluginBuilder {
     lines.push('    BaseService, BaseEventHandler, BaseAdapter,');
     lines.push('    BaseCommand, BaseRouter, BaseConfig,');
     lines.push(')');
+    lines.push('from src.core.components.types import ChatType, PermissionLevel');
     lines.push('');
 
     // 如果有配置组件，导入 config
@@ -98,6 +99,50 @@ export class PluginBuilder {
         lines.push('');
         lines.push('    async def some_method(self):');
         lines.push('        """自定义方法"""');
+        lines.push('        pass');
+      } else if (comp.type === 'agent') {
+        lines.push(`    component_name = "${comp.name}"`);
+        lines.push(`    agent_description = "${comp.description || '代理组件'}"`);
+        lines.push('');
+        lines.push('    async def execute(self, **kwargs):');
+        lines.push('        """执行 Agent 逻辑"""');
+        lines.push('        pass');
+      } else if (comp.type === 'event_handler') {
+        lines.push(`    handler_name = "${comp.name}"`);
+        lines.push(`    handler_description = "${comp.description || '事件处理器'}"`);
+        lines.push('    weight = 0');
+        lines.push('    intercept_message = False');
+        lines.push(`    init_subscribe = [${comp.metadata?.eventType ? `"${comp.metadata.eventType}"` : ''}]`);
+        lines.push('');
+        lines.push('    async def execute(self, event_name: str, params: dict):');
+        lines.push('        """处理事件"""');
+        lines.push('        from src.core.components.types import EventDecision');
+        lines.push('        return EventDecision.SUCCESS, params');
+      } else if (comp.type === 'command') {
+        lines.push(`    command_name = "${comp.name}"`);
+        lines.push(`    command_description = "${comp.description || '命令组件'}"`);
+        lines.push(`    permission_level = PermissionLevel.${comp.metadata?.permission || 'USER'}`);
+        lines.push('');
+        lines.push('    async def execute(self, **kwargs):');
+        lines.push('        """执行命令"""');
+        lines.push('        pass');
+      } else if (comp.type === 'adapter') {
+        lines.push(`    adapter_name = "${comp.name}"`);
+        lines.push(`    adapter_description = "${comp.description || '适配器'}"`);
+        lines.push('');
+        lines.push('    async def connect(self):');
+        lines.push('        """建立连接"""');
+        lines.push('        pass');
+        lines.push('');
+        lines.push('    async def disconnect(self):');
+        lines.push('        """断开连接"""');
+        lines.push('        pass');
+      } else if (comp.type === 'router') {
+        lines.push(`    router_name = "${comp.name}"`);
+        lines.push(`    router_description = "${comp.description || 'HTTP 路由'}"`);
+        lines.push('');
+        lines.push('    def register_routes(self, app):');
+        lines.push('        """注册 HTTP 路由"""');
         lines.push('        pass');
       } else {
         // 其他类型的通用骨架

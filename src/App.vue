@@ -317,15 +317,40 @@ const createToolbox = () => {
     <xml>
       <category name="插件" colour="#7C3AED">
         <block type="plugin_declare"></block>
+        <block type="dependency_declare"></block>
       </category>
       <category name="组件" colour="#06B6D4">
+        <label text="── 核心组件 ──"></label>
         <block type="component_action"></block>
         <block type="component_tool"></block>
+        <block type="component_chatter"></block>
         <block type="component_service"></block>
+        <label text="── 扩展组件 ──"></label>
+        <block type="component_agent"></block>
+        <block type="component_event_handler"></block>
+        <block type="component_command"></block>
+        <block type="component_adapter"></block>
+        <block type="component_router"></block>
+        <block type="component_config"></block>
+      </category>
+      <category name="参数与激活" colour="#F59E0B">
+        <block type="param_define"></block>
+        <block type="action_activation"></block>
+        <block type="chat_type"></block>
+      </category>
+      <category name="配置" colour="#84CC16">
+        <block type="config_section"></block>
+        <block type="config_field"></block>
       </category>
       <category name="事件" colour="#F97316">
         <block type="event_subscribe"></block>
         <block type="event_publish"></block>
+      </category>
+      <category name="值" colour="#8B5CF6">
+        <block type="text_mofox"></block>
+        <block type="number_mofox"></block>
+        <block type="bool_mofox"></block>
+        <block type="python_code"></block>
       </category>
     </xml>
   `
@@ -414,4 +439,4 @@ const connectGitHub = async () => {
   }
 }
 </script>
-
+
