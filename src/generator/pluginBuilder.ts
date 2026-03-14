@@ -33,12 +33,14 @@ export class PluginBuilder {
     lines.push('@register_plugin');
     lines.push(`class ${this.getPluginClassName(pluginName)}(BasePlugin):`);
     lines.push(`    plugin_name = "${pluginName}"`);
-    lines.push('    configs = []');
+    lines.push(`    plugin_description = "${pluginName}"`);
 
     // 添加配置类引用
     if (components.some((c) => c.type === 'config')) {
       const configClassName = this.getConfigClassName(pluginName);
       lines.push(`    configs = [${configClassName}]`);
+    } else {
+      lines.push('    configs = []');
     }
 
     lines.push('');
@@ -73,36 +75,68 @@ export class PluginBuilder {
       lines.push(`    """${comp.description || `${comp.type} 组件`}"""`);
 
       if (comp.type === 'action') {
-        lines.push(`    component_name = "${comp.name}"`);
+        lines.push(`    action_name = "${comp.name}"`);
+        lines.push(`    action_description = "${comp.description || '动作'}"`);
+        if (comp.metadata?.chatType) {
+          lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
+        }
+        // 生成参数 schema
+        if (comp.params && comp.params.length > 0) {
+          lines.push('');
+          this.generateSchema(lines, comp.params);
+        }
         lines.push('');
-        lines.push('    async def execute(self, **kwargs):');
-        lines.push('        """执行 Action"""');
-        lines.push('        pass');
+        const paramSig = this.buildParamSignature(comp.params);
+        lines.push(`    async def execute(self${paramSig}) -> tuple[bool, str]:`);
+        lines.push(`        """${comp.description || '执行动作'}"""`);
+        lines.push('        # TODO: 在这里写你的逻辑');
+        lines.push('        return True, "执行成功"');
         lines.push('');
-        lines.push('    async def go_activate(self):');
-        lines.push('        """激活 Action"""');
-        lines.push('        pass');
+        lines.push('    async def go_activate(self) -> bool:');
+        this.generateActivation(lines, comp.metadata?.activation);
       } else if (comp.type === 'tool') {
-        lines.push(`    component_name = "${comp.name}"`);
+        lines.push(`    tool_name = "${comp.name}"`);
+        lines.push(`    tool_description = "${comp.description || '工具'}"`);
+        if (comp.metadata?.chatType) {
+          lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
+        }
+        if (comp.params && comp.params.length > 0) {
+          lines.push('');
+          this.generateSchema(lines, comp.params);
+        }
         lines.push('');
-        lines.push('    async def execute(self, **kwargs):');
-        lines.push('        """执行 Tool"""');
-        lines.push('        pass');
+        const toolParamSig = this.buildParamSignature(comp.params);
+        lines.push(`    async def execute(self${toolParamSig}) -> tuple[bool, str]:`);
+        lines.push(`        """${comp.description || '执行工具'}"""`);
+        lines.push('        # TODO: 在这里写你的逻辑');
+        lines.push('        return True, "执行成功"');
       } else if (comp.type === 'chatter') {
-        lines.push(`    component_name = "${comp.name}"`);
+        lines.push(`    chatter_name = "${comp.name}"`);
+        lines.push(`    chatter_description = "${comp.description || '对话器'}"`);
+        if (comp.metadata?.chatType) {
+          lines.push(`    chat_type = ChatType.${comp.metadata.chatType}`);
+        }
         lines.push('');
-        lines.push('    async def execute(self, unreads):');
-        lines.push('        """Chatter 主逻辑"""');
-        lines.push('        yield None  # AsyncGenerator');
+        lines.push('    async def execute(self):');
+        lines.push('        """对话主循环，使用 yield 返回结果"""');
+        lines.push('        from src.core.components.base.chatter import Wait, Success');
+        lines.push('        # TODO: 在这里实现你的对话逻辑');
+        lines.push('        unreads = await self.fetch_unreads()');
+        lines.push('        if not unreads:');
+        lines.push('            yield Wait(time=5)');
+        lines.push('            return');
+        lines.push('        yield Success(message="收到消息")');
       } else if (comp.type === 'service') {
-        lines.push(`    component_name = "${comp.name}"`);
+        lines.push(`    service_name = "${comp.name}"`);
+        lines.push(`    service_description = "${comp.description || '后台服务'}"`);
         lines.push('');
-        lines.push('    async def some_method(self):');
+        lines.push('    # TODO: 在这里定义你的服务方法');
+        lines.push('    async def do_something(self):');
         lines.push('        """自定义方法"""');
         lines.push('        pass');
       } else if (comp.type === 'agent') {
-        lines.push(`    component_name = "${comp.name}"`);
-        lines.push(`    agent_description = "${comp.description || '代理组件'}"`);
+        lines.push(`    agent_name = "${comp.name}"`);
+        lines.push(`    agent_description = "${comp.description || '智能体'}"`);
         lines.push('');
         lines.push('    async def execute(self, **kwargs):');
         lines.push('        """执行 Agent 逻辑"""');
@@ -120,12 +154,18 @@ export class PluginBuilder {
         lines.push('        return EventDecision.SUCCESS, params');
       } else if (comp.type === 'command') {
         lines.push(`    command_name = "${comp.name}"`);
-        lines.push(`    command_description = "${comp.description || '命令组件'}"`);
+        lines.push(`    command_description = "${comp.description || '命令'}"`);
         lines.push(`    permission_level = PermissionLevel.${comp.metadata?.permission || 'USER'}`);
+        if (comp.params && comp.params.length > 0) {
+          lines.push('');
+          this.generateSchema(lines, comp.params);
+        }
         lines.push('');
-        lines.push('    async def execute(self, **kwargs):');
-        lines.push('        """执行命令"""');
-        lines.push('        pass');
+        const cmdParamSig = this.buildParamSignature(comp.params);
+        lines.push(`    async def execute(self${cmdParamSig}) -> tuple[bool, str]:`);
+        lines.push(`        """${comp.description || '执行命令'}"""`);
+        lines.push('        # TODO: 在这里写你的逻辑');
+        lines.push('        return True, "命令执行成功"');
       } else if (comp.type === 'adapter') {
         lines.push(`    adapter_name = "${comp.name}"`);
         lines.push(`    adapter_description = "${comp.description || '适配器'}"`);
@@ -203,5 +243,64 @@ export class PluginBuilder {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join('');
     return pascalName + 'Config';
+  }
+
+  /**
+   * 生成 to_schema 方法（LLM function calling 的参数描述）
+   */
+  private static generateSchema(lines: string[], params: any[]): void {
+    lines.push('    @classmethod');
+    lines.push('    def to_schema(cls) -> dict:');
+    lines.push('        return {');
+    lines.push('            "type": "function",');
+    lines.push('            "function": {');
+    lines.push(`                "name": cls.action_name if hasattr(cls, 'action_name') else cls.tool_name,`);
+    lines.push(`                "description": cls.action_description if hasattr(cls, 'action_description') else cls.tool_description,`);
+    lines.push('                "parameters": {');
+    lines.push('                    "type": "object",');
+    lines.push('                    "properties": {');
+    for (const p of params) {
+      lines.push(`                        "${p.name}": {"type": "${p.type}", "description": "${p.description}"},`);
+    }
+    lines.push('                    },');
+    const required = params.filter((p: any) => p.required).map((p: any) => `"${p.name}"`);
+    lines.push(`                    "required": [${required.join(', ')}],`);
+    lines.push('                },');
+    lines.push('            },');
+    lines.push('        }');
+  }
+
+  /**
+   * 根据参数列表构建 Python 函数签名片段
+   */
+  private static buildParamSignature(params?: any[]): string {
+    if (!params || params.length === 0) return ', **kwargs';
+    const parts = params.map((p: any) => {
+      const pyType = p.type === 'string' ? 'str' : p.type === 'integer' ? 'int' : p.type === 'boolean' ? 'bool' : 'str';
+      return `${p.name}: ${pyType}`;
+    });
+    return ', ' + parts.join(', ');
+  }
+
+  /**
+   * 根据激活方式生成 go_activate 方法体
+   */
+  private static generateActivation(lines: string[], activation?: string): void {
+    if (!activation || activation === 'always') {
+      lines.push('        """始终激活"""');
+      lines.push('        return True');
+    } else if (activation === 'random') {
+      lines.push('        """随机概率激活"""');
+      lines.push('        return self._random_activation(0.5)');
+    } else if (activation === 'keyword') {
+      lines.push('        """关键词匹配激活"""');
+      lines.push('        return self._keyword_match(["关键词1", "关键词2"])');
+    } else if (activation === 'llm_judge') {
+      lines.push('        """由 AI 判断是否激活"""');
+      lines.push('        return await self._llm_judge_activation(');
+      lines.push('            judge_prompt="判断是否需要执行此动作",');
+      lines.push('            action_require="当用户需要时返回 True",');
+      lines.push('        )');
+    }
   }
 }

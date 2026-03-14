@@ -210,6 +210,7 @@
 import { ref, watch, nextTick } from 'vue'
 import * as Blockly from 'blockly'
 import '@/blocks'
+import { parseWorkspace } from '@/blocks'
 import { usePluginProjectStore } from '@/stores/pluginProject'
 import { ManifestBuilder } from '@/generator/manifestBuilder'
 import { PluginBuilder } from '@/generator/pluginBuilder'
@@ -306,6 +307,11 @@ watch(currentView, (newView, oldView) => {
         if (savedBlocklyXml) {
           const dom = Blockly.utils.xml.textToDom(savedBlocklyXml)
           Blockly.Xml.domToWorkspace(dom, workspace as Blockly.WorkspaceSvg)
+        } else {
+          // 首次进入：自动放一个「我的插件」积木
+          const initXml = `<xml><block type="plugin_main" x="30" y="30"></block></xml>`
+          const dom = Blockly.utils.xml.textToDom(initXml)
+          Blockly.Xml.domToWorkspace(dom, workspace as Blockly.WorkspaceSvg)
         }
       }
     })
@@ -315,42 +321,33 @@ watch(currentView, (newView, oldView) => {
 const createToolbox = () => {
   return `
     <xml>
-      <category name="插件" colour="#7C3AED">
-        <block type="plugin_declare"></block>
-        <block type="dependency_declare"></block>
+      <category name="🦊 功能组件" colour="#06B6D4">
+        <label text="把这些拖进「我的插件」里 ↓"></label>
+        <block type="comp_action"></block>
+        <block type="comp_tool"></block>
+        <block type="comp_chatter"></block>
+        <block type="comp_command"></block>
+        <block type="comp_service"></block>
+        <block type="comp_event_handler"></block>
+        <block type="comp_agent"></block>
+        <block type="comp_adapter"></block>
+        <block type="comp_router"></block>
       </category>
-      <category name="组件" colour="#06B6D4">
-        <label text="── 核心组件 ──"></label>
-        <block type="component_action"></block>
-        <block type="component_tool"></block>
-        <block type="component_chatter"></block>
-        <block type="component_service"></block>
-        <label text="── 扩展组件 ──"></label>
-        <block type="component_agent"></block>
-        <block type="component_event_handler"></block>
-        <block type="component_command"></block>
-        <block type="component_adapter"></block>
-        <block type="component_router"></block>
-        <block type="component_config"></block>
+      <category name="📋 参数" colour="#F59E0B">
+        <label text="拖进「动作/工具/命令」里 ↓"></label>
+        <block type="param_text"></block>
+        <block type="param_number"></block>
+        <block type="param_switch"></block>
       </category>
-      <category name="参数与激活" colour="#F59E0B">
-        <block type="param_define"></block>
-        <block type="action_activation"></block>
-        <block type="chat_type"></block>
+      <category name="⚙️ 插件设置" colour="#84CC16">
+        <label text="让用户能配置你的插件 ↓"></label>
+        <block type="setting_toggle"></block>
+        <block type="setting_text"></block>
+        <block type="setting_number"></block>
       </category>
-      <category name="配置" colour="#84CC16">
-        <block type="config_section"></block>
-        <block type="config_field"></block>
-      </category>
-      <category name="事件" colour="#F97316">
-        <block type="event_subscribe"></block>
-        <block type="event_publish"></block>
-      </category>
-      <category name="值" colour="#8B5CF6">
-        <block type="text_mofox"></block>
-        <block type="number_mofox"></block>
-        <block type="bool_mofox"></block>
-        <block type="python_code"></block>
+      <category name="📦 依赖" colour="#EF4444">
+        <label text="需要其他插件时用 ↓"></label>
+        <block type="need_plugin"></block>
       </category>
     </xml>
   `
@@ -381,21 +378,49 @@ const addComponent = () => {
 }
 
 const generateCode = async () => {
+  if (!workspace) {
+    alert('请先打开积木编辑器')
+    return
+  }
+
+  // 从积木工作区解析插件信息
+  const parsed = parseWorkspace(workspace)
+  if (!parsed) {
+    alert('请先拖入「🦊 我的插件」积木')
+    return
+  }
+  if (parsed.components.length === 0 && parsed.settings.length === 0) {
+    alert('你的插件里还没有任何功能，请拖入一些组件积木')
+    return
+  }
+
+  // 同步到 store
+  pluginStore.pluginName = parsed.name
+  pluginStore.pluginVersion = parsed.version
+  pluginStore.pluginDescription = parsed.description
+  pluginStore.components = parsed.components
+
+  // 如果有设置项，自动追加一个 config 组件
+  const allComps = [...parsed.components]
+  if (parsed.settings.length > 0) {
+    allComps.push({ type: 'config', name: 'config', settings: parsed.settings } as any)
+  }
+
   const manifest = ManifestBuilder.generate(
-    pluginStore.pluginName || 'default_plugin',
-    pluginStore.pluginVersion || '1.0.0',
-    pluginStore.components
+    parsed.name,
+    parsed.version,
+    allComps
   )
 
-  const pluginPy = PluginBuilder.generate(
-    pluginStore.pluginName || 'default_plugin',
-    pluginStore.components
-  )
+  // 处理依赖
+  if (parsed.dependencies.length > 0) {
+    manifest.dependencies = {
+      plugins: parsed.dependencies,
+    }
+  }
 
-  const configPy = ConfigBuilder.generate(
-    pluginStore.pluginName || 'default_plugin',
-    pluginStore.components
-  )
+  const pluginPy = PluginBuilder.generate(parsed.name, allComps)
+  const configPy = ConfigBuilder.generate(parsed.name, allComps, parsed.settings)
 
   pluginStore.generatedManifest = manifest
   pluginStore.generatedPluginPy = pluginPy
@@ -403,7 +428,6 @@ const generateCode = async () => {
   pluginStore.buildStatus = 'ready'
 
   currentView.value = 'code'
-  console.log('代码生成完成')
 }
 
 const syncToGithub = async () => {
